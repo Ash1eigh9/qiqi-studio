@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QiQi Loyalty Card</title>
+<meta name="theme-color" content="#7a2b3b">
+<meta name="robots" content="noindex">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}[hidden]{display:none!important}
+
+/* Layout: one centred loyalty card in QiQi's wine-and-blush glow, with the card's rules underneath. Single brand look in both themes. */
+:root{
+  --wine:#7a2b3b; --wine-deep:#5e1f2c; --blush:#f6d9dc; --blush-hi:#fbecee; --ink:#3a1a21; --muted:#8a5f68;
+  --display:"Fraunces", Georgia, "Times New Roman", serif;
+  --body:"DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--wine);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.page{max-width:560px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+/* card (same design as in the studio book) */
+.lc{position:relative;aspect-ratio:1.6/1;max-width:100%;border-radius:20px;overflow:hidden;background:var(--wine);color:var(--wine);
+  box-shadow:0 18px 40px rgba(30,5,12,.35);container-type:inline-size}
+.lc::before{content:"";position:absolute;inset:-12% -6%;background:radial-gradient(ellipse 58% 62% at 50% 50%,var(--blush-hi) 0%,var(--blush) 55%,rgba(246,217,220,0) 100%)}
+.lc-in{position:relative;height:100%;display:grid;grid-template-rows:auto auto 1fr auto;padding:6cqw 8cqw 5cqw;gap:1.6cqw}
+.lc-top{display:flex;justify-content:space-between;align-items:baseline}
+.lc-logo{font-family:var(--display);font-style:italic;font-weight:600;font-size:9cqw;line-height:1}
+.lc-logo span{font-style:normal;font-size:4cqw;vertical-align:super}
+.lc-tag{font-size:2.3cqw;letter-spacing:.28em;text-transform:uppercase;font-weight:600}
+.lc-name{font-family:var(--display);font-size:4.4cqw;font-weight:500}
+.lc-name small{font-family:var(--body);font-size:2.4cqw;letter-spacing:.14em;text-transform:uppercase;margin-left:1.5cqw;opacity:.75}
+.lc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2.2cqw 4cqw;align-content:center;justify-items:center}
+.lc-dot{width:10.5cqw;aspect-ratio:1;border-radius:50%;border:.45cqw dashed rgba(122,43,59,.55);display:grid;place-items:center;font-size:2cqw;font-weight:600;text-align:center;line-height:1.1;color:rgba(122,43,59,.75)}
+.lc-dot.on{background:var(--wine);border:0;color:var(--blush);font-size:5.5cqw}
+.lc-dot.gift:not(.on){border-style:solid;border-color:var(--wine);color:var(--wine)}
+.lc-foot{display:flex;justify-content:space-between;gap:2cqw;font-size:2.3cqw;letter-spacing:.06em}
+.lc-foot b{font-weight:600}
+@media (prefers-reduced-motion:no-preference){.lc-dot.on.new{animation:stamp .5s ease-out}}
+@keyframes stamp{0%{transform:scale(1.6) rotate(-20deg);opacity:0}100%{transform:none;opacity:1}}
+/* below the card */
+.box{background:var(--blush);border-radius:16px;padding:18px}
+h1{font-family:var(--display);font-weight:600;font-size:26px;margin:0;color:var(--blush);text-wrap:balance}
+.lede{color:var(--blush);opacity:.9;margin:4px 0 0}
+h2{font-family:var(--display);font-style:italic;font-weight:500;font-size:20px;margin:0 0 8px;color:var(--wine)}
+.progress{font-family:var(--display);font-size:22px;color:var(--wine);margin:0}
+ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.foot{color:var(--blush);text-align:center;font-size:12px;letter-spacing:.24em;text-transform:uppercase;opacity:.85}
+.bad{background:var(--blush);border-radius:16px;padding:18px}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div><h1 id="hi">Your QiQi loyalty card</h1><p class="lede" id="lede">Every set gets a chop ✦</p></div>
+  <div id="card"></div>
+  <div class="box" id="status" hidden><p class="progress" id="prog"></p></div>
+  <div class="box">
+    <h2>How it works</h2>
+    <ul>
+      <li>Get <b>1 chop</b> for every nail set or custom press-on order.</li>
+      <li><b>Chop 4:</b> a free add-on, up to $8 (hard gel overlay or extra charms).</li>
+      <li><b>Chop 8:</b> $15 off that set. Then a fresh card starts.</li>
+      <li><b>Refer a friend:</b> when they book, you both get a bonus chop.</li>
+      <li>Your card updates by itself after every visit. Save this page or add it to your home screen. Lost the link? Just tell QiQi your name.</li>
+    </ul>
+  </div>
+  <div class="foot">QiQi Nail Studio · @qiqi.nailstudio</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig } from "./config.js";
+const SIZE=8, GIFTS={4:"free<br>add-on",8:"$15<br>off"};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let lastStamps=null;
+function cardHTML(name,stamps,cards,fresh){
+  let dots=""; for(let i=1;i<=SIZE;i++){ const on=i<=stamps; dots+=`<div class="lc-dot ${on?"on":""} ${GIFTS[i]?"gift":""} ${on&&fresh&&i===stamps?"new":""}">${on?"\u2726":(GIFTS[i]||i)}</div>`; }
+  return `<div class="lc" role="img" aria-label="${stamps} of ${SIZE} chops"><div class="lc-in">
+    <div class="lc-top"><div class="lc-logo">QiQi<span>\u2726</span></div><div class="lc-tag">Loyalty card</div></div>
+    <div class="lc-name">${name}${cards?`<small>${cards} card${cards>1?"s":""} completed</small>`:""}</div>
+    <div class="lc-grid">${dots}</div>
+    <div class="lc-foot"><span><b>Chop 4</b> \u00b7 free add-on</span><span><b>Chop 8</b> \u00b7 $15 off</span></div></div></div>`;
+}
+const card=document.getElementById("card");
+function note(t){ card.innerHTML=cardHTML("Your name here",0,0)+`<p class="bad" style="margin-top:16px">${t}</p>`; }
+const id=new URLSearchParams(location.search).get("c");
+if(!id || !/^[a-z0-9]{8,40}$/.test(id)) note("This is the QiQi card page. Ask QiQi for your personal card link.");
+else {
+  card.innerHTML=cardHTML("Loading your card\u2026",0,0);
+  const fs=getFirestore(initializeApp(firebaseConfig));
+  onSnapshot(doc(fs,"cards",id),snap=>{
+    if(!snap.exists()){ note("We couldn't find this card. Ask QiQi to send you a fresh link. Your chops are safe in her book."); return; }
+    const d=snap.data(), stamps=Math.min(+d.stamps||0,SIZE), cards=+d.cardsDone||0, name=d.name||"QiQi friend";
+    document.getElementById("hi").textContent=`Hi ${name} \u2726`;
+    card.innerHTML=cardHTML(esc(name),stamps,cards,lastStamps!==null&&stamps!==lastStamps); lastStamps=stamps;
+    const next=stamps>=SIZE?1:stamps+1, left=SIZE-stamps; let msg;
+    if(stamps>=SIZE) msg="Card complete! Your $15 off was on this set. Your next visit starts a new card.";
+    else if(next===4) msg="Your next set is chop 4: a free add-on is on us.";
+    else if(next===SIZE) msg="Your next set is chop 8: $15 off!";
+    else if(stamps<4) msg=`${stamps} of ${SIZE} chops \u00b7 ${4-stamps} more to a free add-on.`;
+    else msg=`${stamps} of ${SIZE} chops \u00b7 ${left} more to $15 off.`;
+    document.getElementById("prog").textContent=msg; document.getElementById("status").hidden=false;
+  },()=>note("Couldn't load your card right now. Check your connection and try again."));
+}
+</script>
+</body>
+</html>
