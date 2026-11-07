@@ -307,7 +307,7 @@ const SCHEMA = {
     {k:"promo",l:"Promo / offer used",t:"text",promo:true,full:true},
     {calc:true},
     {k:"price",l:"Price charged via PayNow ($)",t:"money",auto:true},{k:"tip",l:"Tip ($)",t:"money"},
-    {k:"deposit",l:"Deposit ($)",t:"money"},{k:"depositPaid",l:"Deposit received",t:"check"},
+    {k:"deposit",l:"Deposit ($)",t:"money"},{k:"depositPaid",l:"Deposit received ($12)",t:"check"},
     {k:"status",l:"Status",t:"select",o:opt(APPT_STATUS)},
     {k:"notes",l:"Notes",t:"textarea",full:true}]},
   clients:{col:"clients",title:"client",fields:[
@@ -351,7 +351,8 @@ const SCHEMA = {
 /* ---------- state ---------- */
 const S = {appts:[],clients:[],presson:[],supplies:[],expenses:[]};
 let db = null, loaded = {}, dbState = "loading", tab = "today";
-let view = {bk:"upcoming", po:"active", cq:"", month:""};
+let view = {bk:"upcoming", po:"active", cq:"", month:"", period:"month"};
+const DEPOSIT = 12;
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -420,7 +421,7 @@ function exampleBanner(){
   return n ? `<div class="notice"><span>${n} example entries are showing so you can see how each tab works. They're marked <span class="chip ex">Example</span>.</span><button id="clearEx" data-clear>Clear examples</button></div>` : "";
 }
 function rToday(){
-  const t=today(), ms=monthSummary(thisMonth());
+  const t=today(), allTime=view.period==="all", ms=monthSummary(allTime?"":thisMonth());
   const upcoming = S.appts.filter(a=>a.status==="Booked" && (a.date||"")>=t).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   const overdue = S.appts.filter(a=>a.status==="Booked" && a.date && a.date<t);
   const toShip = S.presson.filter(p=>["Paid","Making","Ready to ship"].includes(p.status)).sort((a,b)=>(a.due||"9").localeCompare(b.due||"9"));
@@ -437,7 +438,7 @@ function rToday(){
   coming.forEach(e=>att.push(`<div><span>On the way: <b>${esc(e.item)}</b>${e.supplier?" from "+esc(e.supplier):""}${exChip(e)}</span><span class="chip">${e.eta?"due "+fmtShort(e.eta):"ordered"}</span></div>`));
   quotes.forEach(p=>att.push(`<div><span>Press-on quote waiting on <b>${esc(p.clientName)}</b>${exChip(p)}</span><span class="chip">${money(pressCalc(p))}</span></div>`));
   return `${exampleBanner()}
-  <div class="bar"><div><div class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</div><h2>${fmtMonth(thisMonth())} so far</h2></div>
+  <div class="bar"><div><div class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</div><h2>${allTime?"Total earnings":fmtMonth(thisMonth())+" so far"}</h2><div style="margin-top:8px">${seg("period",[["month","This month"],["all","All time"]])}</div></div>
   <div class="grp"><button class="primary" data-new="appts">New booking</button><button data-new="presson">New press-on order</button></div></div>
   <div class="stats">
     <div class="stat"><span>Takings</span><b>${money(ms.income)}</b></div>
@@ -449,7 +450,7 @@ function rToday(){
     <div class="panel"><h3>Coming up</h3><div class="list">${upcoming.slice(0,8).map(a=>apptRow(a,true)).join("") || `<p class="empty">No bookings ahead. Add one when a client DMs.</p>`}</div></div>
     <div class="panel"><h3>Needs attention</h3><div class="att">${att.join("") || `<p class="empty">All caught up. Late press-ons, missing deposits and low supplies will show up here.</p>`}</div></div>
   </div>
-  ${ms.bySet.length?`<div class="panel"><h3>Sets this month</h3><div class="scroll"><table><tr><th>Set</th><th class="r">Done</th><th class="r">Takings</th></tr>${ms.bySet.map(r=>`<tr><td>${esc(r.name)}</td><td class="r">${r.n}</td><td class="r">${money(r.sum)}</td></tr>`).join("")}</table></div></div>`:""}`;
+  ${ms.bySet.length?`<div class="panel"><h3>${allTime?"Sets done, all time":"Sets this month"}</h3><div class="scroll"><table><tr><th>Set</th><th class="r">Done</th><th class="r">Takings</th></tr>${ms.bySet.map(r=>`<tr><td>${esc(r.name)}</td><td class="r">${r.n}</td><td class="r">${money(r.sum)}</td></tr>`).join("")}</table></div></div>`:""}`;
 }
 function apptRow(a,showDay){
   const t=today(), quick = a.status==="Booked" && a.date && a.date<=t;
@@ -683,7 +684,9 @@ document.addEventListener("input",e=>{
     updateCalc();
   }
 });
-document.addEventListener("change",e=>{ if(editing && e.target.closest("#frm") && SCHEMA[editing.kind].calc && e.target.type==="checkbox") updateCalc(); });
+document.addEventListener("change",e=>{
+  if(e.target.id==="f_depositPaid"){ const d=$("#f_deposit"); if(e.target.checked && !(+d.value)) d.value=DEPOSIT; else if(!e.target.checked && +d.value===DEPOSIT) d.value=""; }
+  if(editing && e.target.closest("#frm") && SCHEMA[editing.kind].calc && e.target.type==="checkbox") updateCalc(); });
 $("#frm").addEventListener("submit",save);
 document.addEventListener("submit",async e=>{
   if(e.target.id!=="login") return; e.preventDefault(); const er=$("#lerr"); er.hidden=true;
