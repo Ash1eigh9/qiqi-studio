@@ -25,14 +25,14 @@ The code in this repository holds no client data.
 
 ## Firestore rules
 
-Paste these in Firebase → Firestore Database → Rules, with your own User UID:
+Paste these in Firebase → Firestore Database → Rules:
 
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner() {
-      return request.auth != null && request.auth.uid == "PASTE_YOUR_UID_HERE";
+      return request.auth != null && request.auth.uid == "SME92w6C8YXq54Qs0UuB1maQzaj2";
     }
     match /studio/{document=**} {
       allow read, write: if isOwner();
