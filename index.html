@@ -139,6 +139,12 @@ label.chk input{width:18px;height:18px}
 .lc-foot{display:flex;justify-content:space-between;gap:2cqw;font-size:2.3cqw;letter-spacing:.06em}
 .loy{display:grid;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .loy-btns{display:flex;gap:8px;flex-wrap:wrap}
+.lines{display:grid;gap:8px}
+.line{display:grid;grid-template-columns:minmax(0,1fr) 62px 84px 34px;gap:6px;align-items:center}
+.line input[data-lf="name"]{grid-column:1/-1}
+.line button{width:34px;height:34px;padding:0;border-radius:50%}
+.lh{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:-4px}
+.lt{font-size:14px;color:var(--muted)}.lt b{color:var(--wine);font-variant-numeric:tabular-nums}
 .loy textarea{min-height:84px;font-size:13px}
 a.btn{text-decoration:none;display:inline-block}
 .chops{display:inline-flex;gap:4px;align-items:center}
@@ -340,9 +346,11 @@ const SCHEMA = {
     {k:"qty",l:"In stock",t:"number"},{k:"reorderAt",l:"Reorder when at",t:"number"},
     {k:"unitCost",l:"Cost each ($)",t:"money"},{k:"supplier",l:"Supplier",t:"text"},
     {k:"notes",l:"Notes / link",t:"textarea",full:true}]},
-  expenses:{col:"expenses",title:"expense",fields:[
-    {k:"item",l:"What",t:"text",req:true,full:true},
-    {k:"date",l:"Date",t:"date",req:true},{k:"amount",l:"Amount ($)",t:"money"},
+  expenses:{col:"expenses",title:"expense or supply order",fields:[
+    {k:"item",l:"What (optional for a supply order)",t:"text",full:true},
+    {lines:true},
+    {k:"date",l:"Date",t:"date",req:true},{k:"shipping",l:"Shipping fee ($)",t:"money"},
+    {k:"amount",l:"Total ($)",t:"money"},
     {k:"category",l:"Category",t:"select",o:opt(EXP_CAT)},{k:"supplier",l:"Supplier / shop",t:"text"},
     {k:"arrival",l:"Delivery",t:"select",o:opt(["Received","On the way"])},{k:"eta",l:"Expected",t:"date"},
     {k:"notes",l:"Notes",t:"textarea",full:true}]}
@@ -434,8 +442,9 @@ function rToday(){
   toShip.forEach(p=>att.push(`<div><span>Press-ons for <b>${esc(p.clientName)}</b>${exChip(p)}</span><span>${statusChip(p.status)} ${p.due?`<span class="chip ${p.due<t?"bad":""}">ship by ${fmtShort(p.due)}</span>`:""}</span></div>`));
   upcoming.forEach(a=>{ const c=clientByName(a.clientName); if(!c) return; const nx=nextChop(c); if(LOY.gifts[nx]) att.push(`<div><span>Loyalty reward: <b>${esc(a.clientName)}</b> · ${fmtShort(a.date)}</span><span class="chip ok">chop ${nx}: ${LOY.gifts[nx]}</span></div>`); });
   noDep.forEach(a=>att.push(`<div><span>Deposit not in yet: <b>${esc(a.clientName)}</b> · ${fmtShort(a.date)}</span><span class="chip warn">${money(a.deposit)}</span></div>`));
-  low.forEach(s=>att.push(`<div><span>Low on <b>${esc(s.name)}</b>${s.shade?" · "+esc(s.shade):""}${exChip(s)}</span><span class="chip bad">${+s.qty||0} left</span></div>`));
-  coming.forEach(e=>att.push(`<div><span>On the way: <b>${esc(e.item)}</b>${e.supplier?" from "+esc(e.supplier):""}${exChip(e)}</span><span class="chip">${e.eta?"due "+fmtShort(e.eta):"ordered"}</span></div>`));
+  const ow=onTheWay();
+  low.forEach(s=>att.push(`<div><span>Low on <b>${esc(s.name)}</b>${s.shade?" · "+esc(s.shade):""}${exChip(s)}</span><span class="chip ${ow[s.id]?"warn":"bad"}">${+s.qty||0} left${ow[s.id]?` · ${ow[s.id]} ordered`:""}</span></div>`));
+  coming.forEach(e=>att.push(`<div><span>On the way: <b>${esc(e.item)}</b>${e.supplier?" from "+esc(e.supplier):""}${exChip(e)} <span class="chip">${e.eta?"due "+fmtShort(e.eta):"ordered"}</span></span><button type="button" class="mini primary" data-recv="${e.id}">Received</button></div>`));
   quotes.forEach(p=>att.push(`<div><span>Press-on quote waiting on <b>${esc(p.clientName)}</b>${exChip(p)}</span><span class="chip">${money(pressCalc(p))}</span></div>`));
   return `${exampleBanner()}
   <div class="bar"><div><div class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long"})}</div><h2>${allTime?"Total earnings":fmtMonth(thisMonth())+" so far"}</h2><div style="margin-top:8px">${seg("period",[["month","This month"],["all","All time"]])}</div></div>
@@ -525,15 +534,16 @@ function rPress(){
     <div class="end"><span class="num">${money((+p.price||0)+(+p.postageCharged||0))}</span>${statusChip(p.status)}${p.due&&p.due<t&&["Paid","Making","Ready to ship"].includes(p.status)?'<span class="chip bad">late</span>':""}</div></div>`).join("") || `<p class="empty">No press-on orders ${view.po==="active"?"in progress":"yet"}. Each order tracks sizes, postage and tracking numbers.</p>`}</div></div>`;
 }
 function rSupplies(){
+  const ow=onTheWay();
   const low=S.supplies.filter(isLow).length;
   const value=S.supplies.reduce((s,x)=>s+(+x.qty||0)*(+x.unitCost||0),0);
   const cats=[...new Set([...SUP_CAT,...S.supplies.map(s=>s.category||"Other")])];
   const body=cats.map(c=>{ const rs=S.supplies.filter(s=>(s.category||"Other")===c).sort((a,b)=>(a.name||"").localeCompare(b.name||"")); if(!rs.length) return "";
     return `<div class="day">${esc(c)}</div>`+rs.map(s=>`<div class="row" tabindex="0" data-edit="supplies:${s.id}">
       <div class="qty" data-stop><button type="button" aria-label="One less ${esc(s.name)}" data-q="${s.id}:-1">−</button><b>${+s.qty||0}</b><button type="button" aria-label="One more ${esc(s.name)}" data-q="${s.id}:1">+</button></div>
-      <div class="mid"><div class="t">${esc(s.name)}${exChip(s)}</div><div class="s">${esc([s.brand,s.shade,s.unit,s.supplier&&("from "+s.supplier)].filter(Boolean).join(" · "))}</div></div>
+      <div class="mid"><div class="t">${esc(s.name)}${exChip(s)}${ow[s.id]?` <span class="chip warn">+${ow[s.id]} on the way</span>`:""}</div><div class="s">${esc([s.brand,s.shade,s.unit,s.supplier&&("from "+s.supplier)].filter(Boolean).join(" · "))}</div></div>
       <div class="end">${isLow(s)?'<span class="chip bad">Reorder</span>':'<span class="chip ok">OK</span>'}${s.unitCost?`<span class="s num">${money(s.unitCost)} ea</span>`:""}</div></div>`).join(""); }).join("");
-  return `<div class="bar"><h2>Supplies</h2><div class="grp"><button data-new="expenses">Log a supply order</button><button class="primary" data-new="supplies">Add item</button></div></div>
+  return `<div class="bar"><h2>Supplies</h2><div class="grp">${S.supplies.some(isLow)?`<button data-neworder="low">Reorder low items</button>`:""}<button data-neworder="">New supply order</button><button class="primary" data-new="supplies">Add item</button></div></div>
   <div class="stats"><div class="stat"><span>Items</span><b>${S.supplies.length}</b></div><div class="stat"><span>To reorder</span><b>${low}</b></div><div class="stat"><span>Stock value</span><b>${money(value)}</b></div></div>
   <div class="panel"><div class="list">${body || `<p class="empty">Add your gels, tips, charms and packaging. Set a reorder level and you'll be told when to restock.</p>`}</div></div>`;
 }
@@ -557,10 +567,45 @@ function rMoney(){
   ${promoPanel(m)}
   <div class="panel"><h3>Expenses this month</h3><div class="list">${ex.map(e=>`<div class="row" tabindex="0" data-edit="expenses:${e.id}">
     <div class="when">${fmtShort(e.date)}</div>
-    <div class="mid"><div class="t">${esc(e.item)}${exChip(e)}</div><div class="s">${esc([e.category,e.supplier].filter(Boolean).join(" · "))}</div></div>
-    <div class="end"><span class="num">${money(e.amount)}</span>${e.arrival==="On the way"?'<span class="chip warn">On the way</span>':""}</div></div>`).join("") || `<p class="empty">No expenses logged for this month. Add supply runs, lamps, packaging and ads to see your real profit.</p>`}</div></div>
+    <div class="mid"><div class="t">${esc(e.item)}${exChip(e)}</div><div class="s">${esc([e.lines&&e.lines.length?e.lines.length+" item"+(e.lines.length>1?"s":""):"",e.category,e.supplier].filter(Boolean).join(" · "))}</div></div>
+    <div class="end"><span class="num">${money(e.amount)}</span>${e.arrival==="On the way"?`<button type="button" class="mini primary" data-recv="${e.id}">Mark received</button>`:""}</div></div>`).join("") || `<p class="empty">No expenses logged for this month. Add supply runs, lamps, packaging and ads to see your real profit.</p>`}</div></div>
   <div class="panel"><h3>Backup</h3><p style="color:var(--muted);font-size:14px;margin:0 0 10px">Download a copy of everything to keep somewhere safe. You can load it back here any time.</p>
   <div class="loy-btns"><button type="button" id="backup">Download backup</button><label class="btn" for="restore" style="display:inline-block;font-size:14px;color:var(--ink);cursor:pointer">Load backup file<input id="restore" type="file" accept="application/json,.json" hidden></label></div></div>`;
+}
+
+/* ---------- supply orders ---------- */
+const round2=n=>Math.round(n*100)/100;
+const linesTotal=()=>round2((editing?.lines||[]).reduce((t,l)=>t+(+l.qty||0)*(+l.cost||0),0));
+const supplyName=s=>s?(s.name+(s.shade?" · "+s.shade:"")):"";
+function onTheWay(){ const m={}; S.expenses.filter(e=>e.arrival==="On the way"&&!e.stocked).forEach(e=>(e.lines||[]).forEach(l=>{ m[l.supplyId]=(m[l.supplyId]||0)+(+l.qty||0); })); return m; }
+function renderLines(){
+  const box=$("#lines"); if(!box) return; const L=editing.lines;
+  const opts=S.supplies.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"")).map(x=>`<option value="${x.id}">${esc(supplyName(x))}</option>`).join("");
+  box.innerHTML=`<div class="sect">Items in this order</div>`+(L.length?`<div class="line lh" aria-hidden="true"><span>Item</span><span>Qty</span><span>$ each</span><span></span></div>`:"")+L.map((l,i)=>`<div class="line" data-i="${i}">
+    <select data-lf="supplyId" aria-label="Item ${i+1}"><option value="">Choose item…</option>${opts}<option value="__new">+ New item</option></select>
+    <input data-lf="qty" type="number" min="1" step="1" inputmode="numeric" value="${esc(l.qty??1)}" aria-label="Quantity" title="Quantity">
+    <input data-lf="cost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(l.cost??"")}" placeholder="$ each" aria-label="Cost each">
+    <button type="button" class="ghost" data-rmline="${i}" aria-label="Remove item ${i+1}">✕</button>
+    ${l.supplyId==="__new"?`<input data-lf="name" placeholder="New item name, e.g. Builder gel (clear)" value="${esc(l.name||"")}" aria-label="New item name">`:""}</div>`).join("")
+    +`<div class="bar"><button type="button" class="mini" data-addline>+ Add item</button><span class="lt" id="ltotal">Items <b>${money(linesTotal())}</b></span></div>`
+    +(editing.rec&&editing.rec.stocked?`<span class="lt">Already added to your stock when it arrived.</span>`:"");
+  L.forEach((l,i)=>{ box.querySelector(`[data-i="${i}"] select`).value=l.supplyId||""; });
+}
+function updateOrderTotal(){
+  const lt=$("#ltotal"); if(lt) lt.innerHTML=`Items <b>${money(linesTotal())}</b>`;
+  if(!editing.lines.length || editing.amtTouched) return;
+  $("#f_amount").value=round2(linesTotal()+(+$("#f_shipping").value||0));
+}
+async function stockIn(lines){
+  for(const l of lines){ const x=S.supplies.find(y=>y.id===l.supplyId); if(!x) continue;
+    const q=(+x.qty||0)+(+l.qty||0); await db.collection("supplies").doc(x.id).update({qty:q,...(+l.cost?{unitCost:+l.cost}:{})}); x.qty=q; }
+}
+async function receiveOrder(id){
+  const e=S.expenses.find(x=>x.id===id); if(!e) return;
+  const hasLines=!!(e.lines&&e.lines.length);
+  if(hasLines && !e.stocked) await stockIn(e.lines);
+  await db.collection("expenses").doc(id).update({arrival:"Received",stocked:hasLines});
+  toast(hasLines?`Received · ${e.lines.reduce((t,l)=>t+(+l.qty||0),0)} items added to your stock`:"Marked as received");
 }
 
 /* ---------- form ---------- */
@@ -570,11 +615,13 @@ function openForm(kind,id,preset){
   const sc=SCHEMA[kind], rec=id?S[kind].find(r=>r.id===id):null;
   const v=rec?{...rec}:{...defaults(kind),...(preset||{})};
   editing={kind,id,rec,touched: rec && sc.calc ? (+rec.price||0)!==sc.calc(rec) : false};
+  if(kind==="expenses"){ editing.lines=JSON.parse(JSON.stringify(rec?.lines||preset?.lines||[])); editing.amtTouched=!!(rec && editing.lines.length && Math.abs((+rec.amount||0)-round2(linesTotal()+(+rec.shipping||0)))>0.009); }
   const names=[...new Set(S.clients.map(c=>c.name).concat(S.appts.map(a=>a.clientName),S.presson.map(p=>p.clientName)).filter(Boolean))].sort();
   let h=`<div class="bar"><h2>${rec?"Edit":"New"} ${sc.title}</h2><button type="button" class="ghost" data-close>Close</button></div>${kind==="clients"&&rec?'<div id="loy"></div>':""}<div class="fgrid">`;
   sc.fields.forEach(f=>{
     if(f.s){ h+=`<div class="sect">${f.s}</div>`; return; }
     if(f.calc){ h+=`<div class="suggest" id="sugg"></div>`; return; }
+    if(f.lines){ h+=`<div class="full lines" id="lines"></div>`; return; }
     const id="f_"+f.k, val=v[f.k]??"", cls=f.full?"full":"";
     if(f.t==="check") h+=`<label class="chk ${cls}"><input type="checkbox" id="${id}" ${val?"checked":""}> ${f.l}</label>`;
     else if(f.t==="select") h+=`<label class="${cls}">${f.l}<select id="${id}">${f.o.map(o=>`<option value="${esc(o.v)}" ${o.v===val?"selected":""}>${esc(o.l)}</option>`).join("")}</select></label>`;
@@ -586,6 +633,7 @@ function openForm(kind,id,preset){
   const frm=$("#frm"); frm.innerHTML=h;
   if(sc.calc) updateCalc();
   if(kind==="clients"&&rec) renderLoy(rec);
+  if(kind==="expenses"){ renderLines(); updateOrderTotal(); }
   $("#dlg").showModal();
   const first=frm.querySelector("input,select"); if(first && !rec) first.focus();
 }
@@ -623,7 +671,22 @@ async function save(e){
   const btn=e.submitter; if(btn) btn.disabled=true;
   try{
     const col=db.collection(sc.col);
+    let toStock=null;
+    if(kind==="expenses"){
+      const lines=[];
+      for(const l of editing.lines){
+        if(!l.supplyId || (l.supplyId==="__new" && !(l.name||"").trim())) continue;
+        let sid=l.supplyId, nm;
+        if(sid==="__new"){ nm=l.name.trim(); const r=db.collection("supplies").doc(); await r.set({name:nm,category:SUP_CAT[0],qty:0,reorderAt:1,unitCost:+l.cost||0,supplier:v.supplier||"",createdAt:Date.now()}); sid=r.id; S.supplies.push({id:sid,name:nm,qty:0}); }
+        else nm=supplyName(S.supplies.find(x=>x.id===sid))||l.name||"Item";
+        lines.push({supplyId:sid,name:nm,qty:Math.max(1,+l.qty||1),cost:+l.cost||0});
+      }
+      v.lines=lines;
+      if(!v.item) v.item=lines.length?lines.map(l=>(l.qty>1?l.qty+"× ":"")+l.name).join(", ").slice(0,140):"Supplies";
+      if(lines.length && v.arrival==="Received" && !(rec&&rec.stocked)){ v.stocked=true; toStock=lines; }
+    }
     const ref=id?col.doc(id):col.doc(); await ref.set(v);
+    if(toStock){ await stockIn(toStock); }
     if(kind==="clients" && v.cardId) await syncCard({...v,id:ref.id});
     if((kind==="appts"||kind==="presson") && v.clientName){
       const ex=clientByName(v.clientName);
@@ -650,6 +713,10 @@ document.addEventListener("click",async e=>{
   const t=e.target.closest("button,[data-edit]"); if(!t) return;
   if(t.matches("[data-close]")){ $("#dlg").close(); return; }
   if(t.dataset.new){ openForm(t.dataset.new); return; }
+  if(t.dataset.addline!==undefined && editing){ editing.lines.push({supplyId:"",qty:1,cost:""}); renderLines(); const sel=$("#lines .line:last-of-type select"); if(sel) sel.focus(); return; }
+  if(t.dataset.rmline!==undefined && editing){ editing.lines.splice(+t.dataset.rmline,1); renderLines(); updateOrderTotal(); return; }
+  if(t.dataset.neworder!==undefined){ const low=S.supplies.filter(isLow); openForm("expenses",null,{arrival:"On the way",category:"Supplies",lines:t.dataset.neworder==="low"?low.map(x=>({supplyId:x.id,qty:1,cost:+x.unitCost||""})):[{supplyId:"",qty:1,cost:""}]}); return; }
+  if(t.dataset.recv){ e.stopPropagation(); t.disabled=true; try{ await receiveOrder(t.dataset.recv); }catch(err){ handleWriteErr(err); } t.disabled=false; return; }
   if(t.id==="signout"){ await signOut(auth); return; }
   if(t.id==="forgot"){ const em=$("#lemail").value.trim(); if(!em){ toast("Type your email first."); return; } try{ await sendPasswordResetEmail(auth,em); toast("Reset link sent. Check your email."); }catch(_){ toast("Couldn't send the reset email."); } return; }
   if(t.id==="backup"){ const out={}; for(const k of Object.keys(S)) out[SCHEMA[k].col]=S[k]; await dl.save({filename:`qiqi-backup-${today()}.json`,data:new Blob([JSON.stringify(out,null,1)],{type:"application/json"})}); return; }
@@ -679,6 +746,15 @@ document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ") && e.
 document.addEventListener("input",e=>{
   if(e.target.id==="cq"){ view.cq=e.target.value; const pos=e.target.selectionStart; render(); const el=$("#cq"); el.focus(); el.setSelectionRange(pos,pos); return; }
   if(e.target.id==="month"){ if(e.target.value){ view.month=e.target.value; render(); } return; }
+  if(editing && editing.kind==="expenses"){
+    const row=e.target.closest(".line");
+    if(row){ const i=+row.dataset.i, f=e.target.dataset.lf, L=editing.lines[i], prev=S.supplies.find(y=>y.id===L.supplyId);
+      L[f]=(f==="qty"||f==="cost")?(e.target.value===""?"":+e.target.value):e.target.value;
+      if(f==="supplyId"){ const x=S.supplies.find(y=>y.id===L.supplyId); if(L.cost===""||L.cost==null||(prev&&+prev.unitCost===+L.cost)) L.cost=x&&+x.unitCost?+x.unitCost:""; renderLines(); }
+      updateOrderTotal(); return; }
+    if(e.target.id==="f_amount") editing.amtTouched=true;
+    if(e.target.id==="f_shipping") updateOrderTotal();
+  }
   if(editing && e.target.closest("#frm") && SCHEMA[editing.kind].calc){
     if(e.target.id==="f_price") editing.touched=true;
     updateCalc();
