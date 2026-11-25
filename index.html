@@ -568,6 +568,7 @@ function rToday(){
   const coming = S.expenses.filter(e=>e.arrival==="On the way").sort((a,b)=>(a.eta||"9").localeCompare(b.eta||"9"));
   const noDep = upcoming.filter(a=>+a.deposit>0 && !a.depositPaid);
   const att = [];
+  S.clients.filter(c=>c.refPending).forEach(c=>att.push(`<div><span>Referral bonus for <b>${esc(c.refPending)}</b> (referred ${esc(c.name)}). Add them as a client, then chop.</span><button type="button" class="mini" data-refdone="${c.id}">Done</button></div>`));
   overdue.forEach(a=>att.push(`<div data-edit="appts:${a.id}" class="row" tabindex="0" style="display:flex;justify-content:space-between"><span>Update past booking: <b>${esc(a.clientName)}</b> · ${fmtShort(a.date)}</span><span class="chip bad">Mark done?</span></div>`));
   toShip.forEach(p=>att.push(`<div><span>Press-ons for <b>${esc(p.clientName)}</b>${exChip(p)}</span><span>${statusChip(p.status)} ${p.due?`<span class="chip ${p.due<t?"bad":""}">ship by ${fmtShort(p.due)}</span>`:""}</span></div>`));
   upcoming.forEach(a=>{ const c=clientByName(a.clientName); if(!c) return; const nx=nextChop(c); if(LOY.gifts[nx]) att.push(`<div><span>Loyalty reward: <b>${esc(a.clientName)}</b> · ${fmtShort(a.date)}</span><span class="chip ok">chop ${nx}: ${LOY.gifts[nx]}</span></div>`); });
@@ -705,6 +706,28 @@ function rMoney(){
   <div class="loy-btns"><button type="button" id="backup">Download backup</button><label class="btn" for="restore" style="display:inline-block;font-size:14px;color:var(--ink);cursor:pointer">Load backup file<input id="restore" type="file" accept="application/json,.json" hidden></label></div></div>`;
 }
 
+/* ---------- referrals ---------- */
+async function referrerBonus(refName,newName,newId){
+  const first=(newName||"").split(" ")[0];
+  const r=clientByName(refName);
+  if(r && r.id!==newId){ await chop(r.id,"referred "+first); justChopped={id:r.id,at:Date.now()}; return `Referral bonus: ${first} and ${r.name.split(" ")[0]} each got a chop \ud83d\udc8c`; }
+  if(refName){ await db.collection("clients").doc(newId).update({refPending:refName}); return `Referral bonus: ${first} got a chop. "${refName}" isn't in your clients yet, so check Today to chop them.`; }
+  return `Referral bonus: ${first} got a chop \ud83d\udc8c`;
+}
+function historyHTML(c){
+  const n=(c.name||"").trim().toLowerCase(), same=x=>(x||"").trim().toLowerCase()===n;
+  const rows=[];
+  S.appts.filter(a=>same(a.clientName)).forEach(a=>{ const counted=a.status==="Done", amt=counted?(+a.price||0)+(+a.tip||0):0;
+    rows.push({d:a.date||"",html:`<span>${fmtShort(a.date)||"No date"} \u00b7 <span class="tier tier-${esc(a.service||"none")}">${esc(byId(SETS,a.service).name.split(" \u00b7 ")[0])}</span>${counted&&+a.tip?` <span style="color:var(--muted);font-size:12px">incl. ${money(a.tip)} tip</span>`:""}</span><span class="num">${counted?money(amt):`<span class="chip ${a.status==="Booked"?"":"bad"}">${esc(a.status)}</span>`}</span>`}); });
+  S.presson.filter(p=>same(p.clientName)).forEach(p=>{ const amt=pressIncome(p);
+    rows.push({d:p.ordered||"",html:`<span>${fmtShort(p.ordered)||"No date"} \u00b7 Press-ons (${esc(byId(PRESS,p.tier).name)})${+p.postageCharged&&amt?` <span style="color:var(--muted);font-size:12px">incl. ${money(p.postageCharged)} postage</span>`:""}</span><span class="num">${amt?money(amt):`<span class="chip">${esc(p.status)}</span>`}</span>`}); });
+  if(!rows.length) return "";
+  rows.sort((a,b)=>b.d.localeCompare(a.d));
+  const st=clientStats(c.name);
+  return `<div class="loy" style="gap:6px"><h3 style="margin:0">Visit history</h3><div class="att">${rows.map(r=>`<div>${r.html}</div>`).join("")}<div><b>Total spent</b><b class="num">${money(st.spent)}</b></div></div>
+    <div style="font-size:12px;color:var(--muted)">Total spent counts finished sets (price + tip) and paid press-ons (price + postage charged). Bookings are matched by the client's name.</div></div>`;
+}
+
 /* ---------- supply orders ---------- */
 const round2=n=>Math.round(n*100)/100;
 const linesTotal=()=>round2((editing?.lines||[]).reduce((t,l)=>t+(+l.qty||0)*(+l.cost||0),0));
@@ -749,7 +772,7 @@ function openForm(kind,id,preset){
   editing={kind,id,rec,touched: rec && sc.calc ? (+rec.price||0)!==sc.calc(rec) : false};
   if(kind==="expenses"){ editing.lines=JSON.parse(JSON.stringify(rec?.lines||preset?.lines||[])); editing.amtTouched=!!(rec && editing.lines.length && Math.abs((+rec.amount||0)-round2(linesTotal()+(+rec.shipping||0)))>0.009); }
   const names=[...new Set(S.clients.map(c=>c.name).concat(S.appts.map(a=>a.clientName),S.presson.map(p=>p.clientName)).filter(Boolean))].sort();
-  let h=`<div class="bar"><h2>${rec?"Edit":"New"} ${sc.title}</h2><button type="button" class="ghost" data-close>Close</button></div>${kind==="clients"&&rec?'<div id="loy"></div>':""}<div class="fgrid">`;
+  let h=`<div class="bar"><h2>${rec?"Edit":"New"} ${sc.title}</h2><button type="button" class="ghost" data-close>Close</button></div>${kind==="clients"&&rec?'<div id="loy"></div><div id="hist"></div>':""}<div class="fgrid">`;
   sc.fields.forEach(f=>{
     if(f.s){ h+=`<div class="sect">${f.s}</div>`; return; }
     if(f.calc){ h+=`<div class="suggest" id="sugg"></div>`; return; }
@@ -764,7 +787,7 @@ function openForm(kind,id,preset){
   <div class="factions"><span>${rec?`<button type="button" id="del">Delete</button>`:""}</span><span class="grp" style="display:flex;gap:8px">${kind==="clients"&&rec?`<button type="button" data-book="${esc(rec.name)}">Book them</button>`:""}<button type="submit" class="primary">Save</button></span></div>`;
   const frm=$("#frm"); frm.innerHTML=h;
   if(sc.calc) updateCalc();
-  if(kind==="clients"&&rec) renderLoy(rec);
+  if(kind==="clients"&&rec){ renderLoy(rec); $("#hist").innerHTML=historyHTML(rec); }
   if(kind==="expenses"){ renderLines(); updateOrderTotal(); }
   $("#dlg").showModal();
   const first=frm.querySelector("input,select"); if(first && !rec) first.focus();
@@ -798,7 +821,7 @@ async function save(e){
   const earns=(kind==="appts"&&v.status==="Done")||(kind==="presson"&&PRESS_PAID.includes(v.status));
   const doChop=earns && !(rec&&rec.chopped) && !!v.clientName;
   if(doChop) v.chopped=true;
-  let chopped=null; const why=kind==="appts"?"set":"press-on";
+  let chopped=null, refMsg=""; const why=kind==="appts"?"set":"press-on";
   if(sc.calc && (v.price===0||v.price==="") && !editing.touched) v.price=sc.calc(v);
   const btn=e.submitter; if(btn) btn.disabled=true;
   try{
@@ -823,17 +846,26 @@ async function save(e){
     if((kind==="appts"||kind==="presson") && v.clientName){
       const ex=clientByName(v.clientName);
       if(!ex){
-        await db.collection("clients").doc().set({name:v.clientName,createdAt:Date.now(),length:v.length||"",shape:v.shape||"",sizes:kind==="presson"?(v.sizes||""):"",source:v.source||"",referredBy:v.referredBy||"",stamps:doChop?1:0,cardsDone:0,chopLog:doChop?[{d:today(),why}]:[]});
-        if(doChop) chopped={name:v.clientName,stamps:1};
+        const isRef=doChop&&v.source==="Referral";
+        const nref=db.collection("clients").doc();
+        await nref.set({name:v.clientName,createdAt:Date.now(),length:v.length||"",shape:v.shape||"",sizes:kind==="presson"?(v.sizes||""):"",source:v.source||"",referredBy:v.referredBy||"",
+          stamps:doChop?(isRef?2:1):0,cardsDone:0,chopLog:doChop?(isRef?[{d:today(),why:"referral bonus"},{d:today(),why}]:[{d:today(),why}]):[],...(isRef?{refBonus:true}:{})});
+        if(doChop) chopped={id:nref.id,name:v.clientName,stamps:isRef?2:1};
+        if(isRef) refMsg=await referrerBonus(v.referredBy,v.clientName,nref.id);
       } else {
         if(kind==="appts" && v.source && !ex.source) await db.collection("clients").doc(ex.id).update({source:v.source,referredBy:v.referredBy||""});
+        const firstEarn=!ex.refBonus&&!(ex.chopLog||[]).length&&!stampsOf(ex)&&!cardsOf(ex);
+        const isRef=doChop&&firstEarn&&(ex.source||v.source)==="Referral";
         if(doChop) chopped=await chop(ex.id,why);
+        if(isRef){ chopped=await chop(ex.id,"referral bonus"); await db.collection("clients").doc(ex.id).update({refBonus:true}); ex.refBonus=true;
+          refMsg=await referrerBonus(ex.referredBy||v.referredBy,v.clientName,ex.id); }
       }
     }
     const celebrate=(kind==="appts"&&v.status==="Done"&&!(rec&&rec.status==="Done"))||(kind==="presson"&&PRESS_PAID.includes(v.status)&&!(rec&&PRESS_PAID.includes(rec.status)));
     if(chopped&&chopped.id) justChopped={id:chopped.id,at:Date.now()};
     $("#dlg").close();
-    if(celebrate){ shower(); toast(`${kind==="appts"?`${v.clientName}'s set is done`:`${v.clientName}'s press-ons are paid`} \u00b7 +${money(kind==="appts"?v.price:(+v.price||0)+(+v.postageCharged||0))} \u2726${chopped?` Now ${stampsOf(chopped)}/8 chops.`:""}`); }
+    if(celebrate){ shower(); toast(`${kind==="appts"?`${v.clientName}'s set is done`:`${v.clientName}'s press-ons are paid`} \u00b7 +${money(kind==="appts"?v.price:(+v.price||0)+(+v.postageCharged||0))} \u2726${chopped?` Now ${stampsOf(chopped)}/8 chops.`:""}${refMsg?" "+refMsg:""}`); }
+    else if(refMsg) toast(refMsg);
     else toast(chopped ? `Saved · ${v.clientName} chopped, now ${stampsOf(chopped)}/8. Send their card from their profile.` : `${sc.title[0].toUpperCase()+sc.title.slice(1)} saved`);
   }catch(err){ if(btn) btn.disabled=false; handleWriteErr(err); }
 }
@@ -856,6 +888,7 @@ document.addEventListener("click",async e=>{
   if(t.dataset.addline!==undefined && editing){ editing.lines.push({supplyId:"",qty:1,cost:""}); renderLines(); const sel=$("#lines .line:last-of-type select"); if(sel) sel.focus(); return; }
   if(t.dataset.rmline!==undefined && editing){ editing.lines.splice(+t.dataset.rmline,1); renderLines(); updateOrderTotal(); return; }
   if(t.dataset.neworder!==undefined){ const low=S.supplies.filter(isLow); openForm("expenses",null,{arrival:"On the way",category:"Supplies",lines:t.dataset.neworder==="low"?low.map(x=>({supplyId:x.id,qty:1,cost:+x.unitCost||""})):[{supplyId:"",qty:1,cost:""}]}); return; }
+  if(t.dataset.refdone){ e.stopPropagation(); try{ await db.collection("clients").doc(t.dataset.refdone).update({refPending:""}); }catch(err){ handleWriteErr(err); } return; }
   if(t.dataset.recv){ e.stopPropagation(); t.disabled=true; try{ await receiveOrder(t.dataset.recv); }catch(err){ handleWriteErr(err); } t.disabled=false; return; }
   if(t.id==="signout"){ await signOut(auth); return; }
   if(t.id==="forgot"){ const em=$("#lemail").value.trim(); if(!em){ toast("Type your email first."); return; } try{ await sendPasswordResetEmail(auth,em); toast("Reset link sent. Check your email."); }catch(_){ toast("Couldn't send the reset email."); } return; }
