@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap">
 <style>
@@ -154,6 +155,38 @@ a.btn{text-decoration:none;display:inline-block}
 .chops i{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--wine)}
 .chops i.on{background:var(--wine)}
 .chops em{font-style:normal;font-size:12px;color:var(--muted);margin-left:4px}
+/* checkout */
+.co{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.co-in{max-width:520px;margin:0 auto;padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+.co-client{background:#7a2b3b}
+.co-client .co-in{color:#3a1a21}
+.co-sheet{background:radial-gradient(ellipse 80% 70% at 50% 40%,#fbecee 0%,#f6d9dc 70%,#f1cdd2 100%);border-radius:24px;padding:22px 20px;display:grid;gap:14px;box-shadow:0 18px 40px rgba(30,5,12,.35)}
+.co-logo{font-family:var(--display);font-style:italic;font-weight:600;font-size:40px;color:#7a2b3b;text-align:center;line-height:1}
+.co-logo span{font-style:normal;font-size:18px;vertical-align:super}
+.co-sub{text-align:center;letter-spacing:.24em;text-transform:uppercase;font-size:11px;color:#7a2b3b;font-weight:600}
+.co-hi{font-family:var(--display);font-size:24px;text-align:center;color:#7a2b3b;text-wrap:balance}
+.rcpt{width:100%;border-collapse:collapse;font-size:15px;color:#3a1a21}
+.rcpt td{padding:7px 2px;border-bottom:1px dashed rgba(122,43,59,.25)}
+.rcpt td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rcpt tr.neg td{color:#2e7a54}
+.rcpt tr.tot td{border-bottom:0;font-weight:700;font-size:17px;color:#7a2b3b;padding-top:10px}
+.rcpt tr.due td{border-bottom:0;font-family:var(--display);font-size:26px;font-weight:600;color:#7a2b3b}
+.qrbox{background:#fff;border-radius:18px;padding:14px;display:grid;justify-items:center;gap:6px;max-width:300px;width:100%;margin:0 auto}
+.qrbox svg{width:100%;height:auto;display:block}
+.qrbox .pn{font-weight:700;color:#7b2a8c;letter-spacing:.04em}
+.qrbox small{color:#6b4a52;text-align:center}
+.ticks{display:grid;gap:12px}
+.tick{display:flex;align-items:center;gap:14px;text-align:left;width:100%;padding:16px 18px;border-radius:18px;border:2px solid rgba(122,43,59,.25);background:#fff8f9;color:#3a1a21;font-size:17px;font-weight:500}
+.tick .box{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid #7a2b3b;display:grid;place-items:center;color:transparent;font-size:18px;font-weight:700;transition:background .15s}
+.tick[aria-pressed="true"]{border-color:#7a2b3b;background:#fbe9ec}
+.tick[aria-pressed="true"] .box{background:#7a2b3b;color:#fff6f7}
+.co-sheet textarea{background:#fff8f9;color:#3a1a21;border-color:rgba(122,43,59,.3)}
+.co-sheet .primary{background:#7a2b3b;border-color:#7a2b3b;color:#fff6f7}
+.co-sheet button{color:#3a1a21}
+.co-big{width:100%;padding:14px;font-size:17px}
+.co-back{background:transparent;border:0;color:#f6d9dc;padding:4px 0;justify-self:start}
+.co-sheet .lc{max-width:100%}
+.ghost-submit,.ghost-submit::backdrop{opacity:0!important}
 /* fun */
 .hello{font-family:var(--display);font-style:italic;font-size:21px;color:var(--wine);line-height:1.2}
 .hello-sub{color:var(--muted);font-size:14px}
@@ -207,6 +240,7 @@ a.btn{text-decoration:none;display:inline-block}
   <div class="panel"><h3>Opening your studio book…</h3><p class="empty">Your bookings, clients, press-on orders, supplies and money will appear here.</p></div>
 </main>
 <dialog id="dlg"><form id="frm" method="dialog"></form></dialog>
+<div id="co" class="co" hidden role="dialog" aria-modal="true" aria-label="Checkout"><div class="co-in" id="coin"></div></div>
 <div class="toast" id="toast" hidden></div>
 <div class="fabmenu" id="fabmenu" hidden>
   <button type="button" class="primary" data-new="appts">New booking</button>
@@ -599,7 +633,7 @@ function apptRow(a,showDay){
     <div class="when">${showDay?`<div style="font-size:12px;color:var(--muted);font-weight:500">${fmtShort(a.date)}</div>`:""}${fmtTime(a.time)}</div>
     <div class="mid"><div class="t">${esc(a.clientName)}${exChip(a)} <span class="tier tier-${esc(a.service||"none")}">${esc(byId(SETS,a.service).name.split(" \u00b7 ")[0])}</span></div><div class="s">${esc(apptSummary(a).split(" \u00b7 ").slice(1).join(" \u00b7 ")||"")}${a.design?" · "+esc(a.design):""}</div></div>
     <div class="end"><span class="num">${money(a.price)}${+a.tip&&a.status==="Done"?` <span style="color:var(--muted);font-size:12px">+${money(a.tip)} tip</span>`:""}</span>
-    ${quick?`<button class="mini primary" data-done="${a.id}">Mark done</button>`:statusChip(a.status)}</div></div>`;
+    ${quick?`<button class="mini primary" data-checkout="${a.id}">Checkout</button>`:statusChip(a.status)}</div></div>`;
 }
 function rBookings(){
   const t=today(); let rows=[...S.appts];
@@ -702,8 +736,162 @@ function rMoney(){
     <div class="mid"><div class="t">${esc(e.item)}${exChip(e)}</div><div class="s">${esc([e.lines&&e.lines.length?e.lines.length+" item"+(e.lines.length>1?"s":""):"",e.category,e.supplier].filter(Boolean).join(" · "))}</div></div>
     <div class="end"><span class="num">${money(e.amount)}</span>${e.arrival==="On the way"?`<button type="button" class="mini primary" data-recv="${e.id}">Mark received</button>`:""}</div></div>`).join("") || `<p class="empty">No expenses logged for this month. Add supply runs, lamps, packaging and ads to see your real profit.</p>`}</div></div>
   ${trophyShelf()}
+  ${reviewsPanel(m)}
+  ${paynowPanel()}
   <div class="panel"><h3>Backup</h3><p style="color:var(--muted);font-size:14px;margin:0 0 10px">Download a copy of everything to keep somewhere safe. You can load it back here any time.</p>
   <div class="loy-btns"><button type="button" id="backup">Download backup</button><label class="btn" for="restore" style="display:inline-block;font-size:14px;color:var(--ink);cursor:pointer">Load backup file<input id="restore" type="file" accept="application/json,.json" hidden></label></div></div>`;
+}
+
+/* ---------- PayNow ---------- */
+function crc16(str){ let c=0xFFFF; for(let i=0;i<str.length;i++){ c^=str.charCodeAt(i)<<8; for(let j=0;j<8;j++) c=(c&0x8000)?((c<<1)^0x1021)&0xFFFF:(c<<1)&0xFFFF; } return c.toString(16).toUpperCase().padStart(4,"0"); }
+function tlvParse(str){ const out=[]; let i=0; while(i+4<=str.length){ const id=str.substr(i,2), n=parseInt(str.substr(i+2,2),10); if(isNaN(n)) break; out.push([id,str.substr(i+4,n)]); i+=4+n; } return out; }
+const tlv=(id,v)=>id+String(v.length).padStart(2,"0")+v;
+const validPaynow=str=>typeof str==="string"&&str.startsWith("000201")&&str.includes("SG.PAYNOW")&&crc16(str.slice(0,-4))===str.slice(-4);
+function paynowPayload(base,amount,ref){
+  const f=tlvParse(base).filter(([id])=>!["63","54","62"].includes(id)); let out="",put=false;
+  for(let [id,v] of f){ if(id==="01") v="12"; if(id==="26") v=tlvParse(v).map(([a,b])=>tlv(a,a==="03"?"0":b)).join(""); if(id==="58"&&!put){ out+=tlv("54",amount.toFixed(2)); put=true; } out+=tlv(id,v); }
+  if(!put) out+=tlv("54",amount.toFixed(2));
+  out+=tlv("62",tlv("01",ref.slice(0,25))); out+="6304"; return out+crc16(out);
+}
+function qrSVG(text){
+  if(typeof qrcode!=="function") return "";
+  const q=qrcode(0,"M"); q.addData(text); q.make(); const n=q.getModuleCount(), m=2; let d="";
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(q.isDark(r,c)) d+=`M${c+m} ${r+m}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${n+2*m} ${n+2*m}" shape-rendering="crispEdges" role="img" aria-label="PayNow QR code"><rect width="100%" height="100%" fill="#ffffff"/><path d="${d}" fill="#5b2369"/></svg>`;
+}
+const paynowTail=()=>{ const pn=META.settings.paynow; if(!pn) return ""; const acc=(tlvParse(pn).find(x=>x[0]==="26")||[])[1]||""; const prox=(tlvParse(acc).find(x=>x[0]==="02")||[])[1]||""; return prox.slice(-2); };
+function loadScript(src){ return new Promise((ok,no)=>{ const el=document.createElement("script"); el.src=src; el.onload=ok; el.onerror=no; document.head.appendChild(el); }); }
+async function readQrFromImage(file){
+  if(typeof jsQR!=="function") await loadScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js");
+  const bmp=await createImageBitmap(file); const sc=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+  const cv=document.createElement("canvas"); cv.width=Math.round(bmp.width*sc); cv.height=Math.round(bmp.height*sc);
+  const x=cv.getContext("2d"); x.drawImage(bmp,0,0,cv.width,cv.height); const d=x.getImageData(0,0,cv.width,cv.height);
+  const r=jsQR(d.data,cv.width,cv.height); return r?r.data:null;
+}
+function paynowPanel(){
+  const ok=!!META.settings.paynow;
+  return `<div class="panel"><h3>PayNow</h3><p style="color:var(--muted);font-size:14px;margin:0 0 10px">${ok?`Set up \u2713 Checkout shows a QR with the exact amount (PayNow number ending \u2022\u2022${esc(paynowTail())}).`:"Upload your PayNow QR image once. Checkout will then show clients a QR with the exact amount filled in."}</p>
+  <label class="btn" for="pnfile" style="display:inline-block;font-size:14px;color:var(--ink);cursor:pointer">${ok?"Replace PayNow QR":"Upload PayNow QR"}<input id="pnfile" type="file" accept="image/*" hidden></label></div>`;
+}
+const reviewIcons=r=>[["pricing","\ud83d\udcb8"],["colour","\ud83c\udfa8"],["design","\ud83d\udc85"]].map(([k,i])=>i+(r[k]?"\u2713":"\u2717")).join(" ");
+function reviewsPanel(m){
+  const rs=S.appts.filter(a=>a.review&&(a.date||"").startsWith(m));
+  if(!rs.length) return `<div class="panel"><h3>Client reviews</h3><p class="empty">Reviews from Checkout will show up here.</p></div>`;
+  const pct=k=>Math.round(rs.filter(a=>a.review[k]).length/rs.length*100);
+  const flagged=rs.filter(a=>!(a.review.pricing&&a.review.colour&&a.review.design));
+  const comments=rs.filter(a=>a.review.comment).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  return `<div class="panel"><h3>Client reviews</h3>
+    <div class="stats" style="margin-bottom:12px"><div class="stat"><span>Pricing clear</span><b>${pct("pricing")}%</b></div><div class="stat"><span>Colour happy</span><b>${pct("colour")}%</b></div><div class="stat"><span>Design happy</span><b>${pct("design")}%</b></div><div class="stat"><span>Reviews</span><b>${rs.length}</b></div></div>
+    ${flagged.length?`<div class="att">${flagged.map(a=>`<div><span><b>${esc(a.clientName)}</b> \u00b7 ${fmtShort(a.date)}${a.review.comment?` \u00b7 \u201c${esc(a.review.comment)}\u201d`:""}</span><span class="chip warn">${reviewIcons(a.review)}</span></div>`).join("")}</div>`:`<p class="hello-sub" style="margin:0">Every client this month ticked all three. \ud83d\udc96</p>`}
+    ${comments.filter(a=>!flagged.includes(a)).length?`<div class="att" style="margin-top:8px">${comments.filter(a=>!flagged.includes(a)).map(a=>`<div><span><b>${esc(a.clientName)}</b>: \u201c${esc(a.review.comment)}\u201d</span><span class="hello-sub">${fmtShort(a.date)}</span></div>`).join("")}</div>`:""}</div>`;
+}
+
+/* ---------- checkout ---------- */
+let CO=null;
+function breakdown(a){
+  const L=[]; const set=byId(SETS,a.service);
+  if(set.price) L.push([set.name.split(" \u00b7 ")[0]+(a.design?` \u00b7 ${a.design}`:""),set.price]);
+  const ex=byId(EXT,a.extension); if(ex.price) L.push(["Extensions \u00b7 "+ex.name.split(" (")[0],ex.price]);
+  if(a.hardGel) L.push(["Hard gel overlay",8]);
+  if(+a.singleExt) L.push([`Single nail extension \u00d7 ${a.singleExt}`,a.singleExt*3]);
+  if(+a.repair) L.push([`Nail repair \u00d7 ${a.repair}`,a.repair*2]);
+  if(+a.charms) L.push(["Extra charms & 3D",+a.charms]);
+  const rm=byId(REMOVAL,a.removal); if(rm.id!=="none") L.push([rm.id==="qiqinew"?"Removal of QiQi set (free with new set)":"Removal \u00b7 "+rm.name.split(" (")[0],rm.price]);
+  if(+a.discount) L.push([a.promo?`Discount \u00b7 ${a.promo}`:"Discount",-a.discount]);
+  const listed=round2(L.reduce((t,x)=>t+x[1],0)), price=+a.price||0;
+  if(Math.abs(price-listed)>0.009) L.push([price>listed?"Custom extras":"Price adjustment",round2(price-listed)]);
+  return L;
+}
+function loyaltyFor(a){
+  if(a.chopped) return null; const c=clientByName(a.clientName); const nx=c?nextChop(c):1;
+  if(nx===8) return {nx,label:"Loyalty reward \u00b7 chop 8 ($15 off)",amount:15};
+  if(nx===4){ const addons=(a.hardGel?8:0)+(+a.charms||0); const amt=Math.min(8,addons); return {nx,label:amt?"Loyalty reward \u00b7 free add-on":"Loyalty reward \u00b7 free add-on",amount:amt,none:!amt}; }
+  return {nx,amount:0};
+}
+function coTotals(a){
+  const reward=CO.applyReward&&CO.reward?CO.reward.amount:0, price=+a.price||0;
+  const total=round2(Math.max(0,price-reward)), dep=a.depositPaid?(+a.deposit||0):0, due=round2(Math.max(0,total-dep));
+  return {reward,total,dep,due};
+}
+function rcptHTML(a){
+  const T=coTotals(a);
+  return `<table class="rcpt">${breakdown(a).map(([l,v])=>`<tr class="${v<0?"neg":""}"><td>${esc(l)}</td><td class="r">${v===0?"free":(v<0?"\u2212"+money(-v):money(v))}</td></tr>`).join("")}
+    ${T.reward?`<tr class="neg"><td>\u2726 ${esc(CO.reward.label)}</td><td class="r">\u2212${money(T.reward)}</td></tr>`:""}
+    <tr class="tot"><td>Total</td><td class="r">${money(T.total)}</td></tr>
+    ${T.dep?`<tr class="neg"><td>Deposit paid</td><td class="r">\u2212${money(T.dep)}</td></tr>`:""}
+    <tr class="due"><td>To pay</td><td class="r">${money(T.due)}</td></tr></table>`;
+}
+const coRef=a=>("QIQI "+(a.clientName||"").split(" ")[0].toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12)+" "+new Date().getDate()+new Date().toLocaleString("en",{month:"short"}).toUpperCase()).trim();
+function startCheckout(id){
+  const a=S.appts.find(x=>x.id===id); if(!a) return;
+  if($("#dlg").open) $("#dlg").close();
+  CO={id,step:1,ticks:{pricing:false,colour:false,design:false},comment:"",reward:loyaltyFor(a),applyReward:true};
+  $("#co").hidden=false; document.body.style.overflow="hidden"; renderCo(); $("#co").scrollTop=0;
+}
+function closeCo(){ CO=null; $("#co").hidden=true; $("#co").classList.remove("co-client"); document.body.style.overflow=""; }
+function renderCo(){
+  const a=S.appts.find(x=>x.id===CO.id); if(!a){ closeCo(); return; }
+  const first=(a.clientName||"").split(" ")[0]||"lovely", T=coTotals(a), box=$("#coin"), client=CO.step>=2&&CO.step<=4;
+  $("#co").classList.toggle("co-client",client);
+  const sheet=inner=>`<div class="co-sheet"><div><div class="co-logo">QiQi<span>\u2726</span></div><div class="co-sub">Nail studio</div></div>${inner}</div>`;
+  const back=n=>`<button type="button" class="co-back" data-costep="${n}">\u2039 Back</button>`;
+  if(CO.step===1){
+    const r=CO.reward;
+    box.innerHTML=`<div class="bar"><h2>Checkout \u00b7 ${esc(a.clientName)}</h2><button type="button" class="ghost" data-coclose>Close</button></div>
+      <div class="panel" style="display:grid;gap:10px">${rcptHTML(a).replace('class="rcpt"','class="rcpt" style="color:var(--ink)"')}
+      ${r&&r.amount?`<label class="chk" style="padding-top:0"><input type="checkbox" id="coreward" ${CO.applyReward?"checked":""}> Apply loyalty reward (this set is chop ${r.nx})</label>`:""}
+      ${r&&r.none?`<div class="chip ok" style="white-space:normal">This set is chop 4: a free add-on (up to $8) is due, but none was added. Edit the booking to add one.</div>`:""}
+      ${r&&r.nx===8&&!r.amount?"":""}</div>
+      ${META.settings.paynow?"":`<div class="notice">PayNow isn't set up yet, so no QR will show. Upload your PayNow QR in Money \u2192 PayNow.</div>`}
+      <div class="loy-btns"><button type="button" data-edit="appts:${a.id}">Edit booking</button><button type="button" class="primary" data-costep="2" style="flex:1">Show client \u2192</button></div>
+      <p class="hello-sub" style="margin:0">Next, hand your phone to ${esc(first)}. They'll see the bill, pay with PayNow and tick how happy they are.</p>`;
+    return;
+  }
+  if(CO.step===2){
+    const c=clientByName(a.clientName)||{name:a.clientName,stamps:0};
+    const st=stampsOf(c), preview={...c,id:"__preview",stamps:st>=LOY.size?1:st+1,cardsDone:cardsOf(c)+(st+1===LOY.size?1:0)};
+    justChopped={id:"__preview",at:Date.now()};
+    const pn=META.settings.paynow&&T.due>0?paynowPayload(META.settings.paynow,T.due,coRef(a)):"";
+    box.innerHTML=back(1)+sheet(`<div class="co-hi">Thank you, ${esc(first)} \u2726</div>${rcptHTML(a)}
+      ${T.due<=0?`<div class="co-hi" style="font-size:20px">Nothing more to pay \ud83c\udf89</div>`:pn?`<div class="qrbox">${qrSVG(pn)}<div class="pn">PayNow \u00b7 ${money(T.due)}</div><small>Scan with your banking app. The amount and reference (${esc(coRef(a))}) are filled in.</small></div>`:`<div class="co-hi" style="font-size:18px">Please PayNow ${money(T.due)} to QiQi</div>`}
+      <div class="co-sub" style="margin-top:4px">Your loyalty card</div>${cardHTML(preview)}
+      <button type="button" class="primary co-big" data-costep="3">Next \u2192</button>`);
+    return;
+  }
+  if(CO.step===3){
+    const item=(k,l)=>`<button type="button" class="tick" data-tick="${k}" aria-pressed="${!!CO.ticks[k]}"><span class="box">\u2713</span>${l}</button>`;
+    box.innerHTML=back(2)+sheet(`<div class="co-hi">How was your set, ${esc(first)}?</div><div class="co-sub" style="letter-spacing:.1em;text-transform:none;font-weight:500;font-size:14px">Tick everything you're happy with</div>
+      <div class="ticks">${item("pricing","Pricing was clear \ud83d\udcb8")}${item("colour","Happy with the colour \ud83c\udfa8")}${item("design","Happy with the design \ud83d\udc85")}</div>
+      <label for="cocomment" style="color:#6b4a52">Anything we could do better? (optional)<textarea id="cocomment">${esc(CO.comment)}</textarea></label>
+      <button type="button" class="primary co-big" data-costep="4">Done \u2726</button>`);
+    return;
+  }
+  if(CO.step===4){
+    box.innerHTML=sheet(`<div class="co-hi" style="font-size:30px;margin-top:10px">Thank you, ${esc(first)}! \ud83d\udc96</div><div class="co-hi" style="font-size:18px">See you next time \u2726</div>
+      <p style="text-align:center;margin:6px 0 0;color:#6b4a52">Please hand the phone back to QiQi.</p>
+      <button type="button" class="co-big" data-costep="5" style="margin-top:12px">Back to QiQi</button>`);
+    shower(); return;
+  }
+  if(CO.step===5){
+    const r=CO.ticks;
+    box.innerHTML=`<div class="bar"><h2>Payment \u00b7 ${esc(a.clientName)}</h2><button type="button" class="ghost" data-costep="2">Show client again</button></div>
+      <div class="panel" style="display:grid;gap:8px"><div class="eyebrow">Waiting for PayNow</div><div class="goalnum">${money(T.due)}</div>
+      <div class="hello-sub">Reference ${esc(coRef(a))}${T.dep?` \u00b7 ${money(T.dep)} deposit already paid`:""}</div>
+      <div class="hello-sub">Their review: ${reviewIcons(r)}${CO.comment?` \u00b7 \u201c${esc(CO.comment)}\u201d`:""}</div></div>
+      <button type="button" class="primary co-big" data-copaid>Payment received \u2713</button>
+      <button type="button" data-copaylater>Not paid yet, save review and close</button>`;
+  }
+}
+async function finishCheckout(paid){
+  const a=S.appts.find(x=>x.id===CO.id); if(!a) return closeCo();
+  const T=coTotals(a), review={pricing:!!CO.ticks.pricing,colour:!!CO.ticks.colour,design:!!CO.ticks.design,comment:CO.comment.trim(),at:Date.now()};
+  if(!paid){ try{ await db.collection("appointments").doc(a.id).update({review}); toast("Review saved. Booking left open until paid."); }catch(err){ handleWriteErr(err); } closeCo(); return; }
+  Object.assign(a,{review,paid:true,paidAt:Date.now(),loyaltyReward:T.reward});
+  closeCo(); openForm("appts",a.id); $("#dlg").classList.add("ghost-submit");
+  $("#f_status").value="Done";
+  if(T.reward){ $("#f_discount").value=round2((+a.discount||0)+T.reward); }
+  editing.touched=true; $("#f_price").value=T.total;
+  $("#frm").requestSubmit();
 }
 
 /* ---------- referrals ---------- */
@@ -718,7 +906,7 @@ function historyHTML(c){
   const n=(c.name||"").trim().toLowerCase(), same=x=>(x||"").trim().toLowerCase()===n;
   const rows=[];
   S.appts.filter(a=>same(a.clientName)).forEach(a=>{ const counted=a.status==="Done", amt=counted?(+a.price||0)+(+a.tip||0):0;
-    rows.push({d:a.date||"",html:`<span>${fmtShort(a.date)||"No date"} \u00b7 <span class="tier tier-${esc(a.service||"none")}">${esc(byId(SETS,a.service).name.split(" \u00b7 ")[0])}</span>${counted&&+a.tip?` <span style="color:var(--muted);font-size:12px">incl. ${money(a.tip)} tip</span>`:""}</span><span class="num">${counted?money(amt):`<span class="chip ${a.status==="Booked"?"":"bad"}">${esc(a.status)}</span>`}</span>`}); });
+    rows.push({d:a.date||"",html:`<span>${fmtShort(a.date)||"No date"} \u00b7 <span class="tier tier-${esc(a.service||"none")}">${esc(byId(SETS,a.service).name.split(" \u00b7 ")[0])}</span>${counted&&+a.tip?` <span style="color:var(--muted);font-size:12px">incl. ${money(a.tip)} tip</span>`:""}${a.review?` <span style="font-size:12px" title="Pricing clear · Colour · Design">${reviewIcons(a.review)}</span>`:""}</span><span class="num">${counted?money(amt):`<span class="chip ${a.status==="Booked"?"":"bad"}">${esc(a.status)}</span>`}</span>`}); });
   S.presson.filter(p=>same(p.clientName)).forEach(p=>{ const amt=pressIncome(p);
     rows.push({d:p.ordered||"",html:`<span>${fmtShort(p.ordered)||"No date"} \u00b7 Press-ons (${esc(byId(PRESS,p.tier).name)})${+p.postageCharged&&amt?` <span style="color:var(--muted);font-size:12px">incl. ${money(p.postageCharged)} postage</span>`:""}</span><span class="num">${amt?money(amt):`<span class="chip">${esc(p.status)}</span>`}</span>`}); });
   if(!rows.length) return "";
@@ -784,7 +972,7 @@ function openForm(kind,id,preset){
     else h+=`<label class="${cls}">${f.l}<input id="${id}" type="${f.t==="money"||f.t==="number"?"number":f.t}" ${f.t==="money"?'step="0.01" min="0" inputmode="decimal"':""}${f.t==="number"?'step="1" min="0" inputmode="numeric"':""} ${f.list?'list="names" autocomplete="off"':""}${f.promo?'list="promos" autocomplete="off"':""} ${f.req?"required":""} value="${esc(val)}"></label>`;
   });
   h+=`</div><datalist id="promos">${PROMOS.map(p=>`<option value="${esc(p)}">`).join("")}</datalist><datalist id="names">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
-  <div class="factions"><span>${rec?`<button type="button" id="del">Delete</button>`:""}</span><span class="grp" style="display:flex;gap:8px">${kind==="clients"&&rec?`<button type="button" data-book="${esc(rec.name)}">Book them</button>`:""}<button type="submit" class="primary">Save</button></span></div>`;
+  <div class="factions"><span>${rec?`<button type="button" id="del">Delete</button>`:""}</span><span class="grp" style="display:flex;gap:8px">${kind==="clients"&&rec?`<button type="button" data-book="${esc(rec.name)}">Book them</button>`:""}${kind==="appts"&&rec&&rec.status==="Booked"?`<button type="button" data-checkout="${rec.id}">Checkout</button>`:""}<button type="submit" class="primary">Save</button></span></div>`;
   const frm=$("#frm"); frm.innerHTML=h;
   if(sc.calc) updateCalc();
   if(kind==="clients"&&rec){ renderLoy(rec); $("#hist").innerHTML=historyHTML(rec); }
@@ -888,6 +1076,12 @@ document.addEventListener("click",async e=>{
   if(t.dataset.addline!==undefined && editing){ editing.lines.push({supplyId:"",qty:1,cost:""}); renderLines(); const sel=$("#lines .line:last-of-type select"); if(sel) sel.focus(); return; }
   if(t.dataset.rmline!==undefined && editing){ editing.lines.splice(+t.dataset.rmline,1); renderLines(); updateOrderTotal(); return; }
   if(t.dataset.neworder!==undefined){ const low=S.supplies.filter(isLow); openForm("expenses",null,{arrival:"On the way",category:"Supplies",lines:t.dataset.neworder==="low"?low.map(x=>({supplyId:x.id,qty:1,cost:+x.unitCost||""})):[{supplyId:"",qty:1,cost:""}]}); return; }
+  if(t.dataset.checkout){ e.stopPropagation(); startCheckout(t.dataset.checkout); return; }
+  if(t.dataset.coclose!==undefined){ closeCo(); return; }
+  if(t.dataset.costep){ if(CO){ CO.step=+t.dataset.costep; renderCo(); $("#co").scrollTop=0; } return; }
+  if(t.dataset.tick){ CO.ticks[t.dataset.tick]=!CO.ticks[t.dataset.tick]; t.setAttribute("aria-pressed",String(CO.ticks[t.dataset.tick])); return; }
+  if(t.dataset.copaid!==undefined){ t.disabled=true; await finishCheckout(true); return; }
+  if(t.dataset.copaylater!==undefined){ t.disabled=true; await finishCheckout(false); return; }
   if(t.dataset.refdone){ e.stopPropagation(); try{ await db.collection("clients").doc(t.dataset.refdone).update({refPending:""}); }catch(err){ handleWriteErr(err); } return; }
   if(t.dataset.recv){ e.stopPropagation(); t.disabled=true; try{ await receiveOrder(t.dataset.recv); }catch(err){ handleWriteErr(err); } t.disabled=false; return; }
   if(t.id==="signout"){ await signOut(auth); return; }
@@ -918,6 +1112,7 @@ document.addEventListener("click",async e=>{
 });
 document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ") && e.target.matches("[data-edit]")){ e.preventDefault(); e.target.click(); }});
 document.addEventListener("input",e=>{
+  if(e.target.id==="cocomment"&&CO){ CO.comment=e.target.value; return; }
   if(e.target.id==="cq"){ view.cq=e.target.value; const pos=e.target.selectionStart; render(); const el=$("#cq"); el.focus(); el.setSelectionRange(pos,pos); return; }
   if(e.target.id==="month"){ if(e.target.value){ view.month=e.target.value; render(); } return; }
   if(editing && editing.kind==="expenses"){
@@ -946,6 +1141,13 @@ document.addEventListener("submit",async e=>{
     : x.code==="auth/too-many-requests" ? "Too many tries. Wait a few minutes and try again." : "Couldn't sign in ("+x.code+")."; er.hidden=false; }
 });
 document.addEventListener("change",async e=>{
+  if(e.target.id==="coreward"&&CO){ CO.applyReward=e.target.checked; renderCo(); return; }
+  if(e.target.id==="pnfile"&&e.target.files[0]){
+    try{ const data=await readQrFromImage(e.target.files[0]);
+      if(!validPaynow(data)) toast("That image isn't a PayNow QR code. Try a clearer screenshot of your QR.");
+      else { await db.collection("meta").doc("settings").set({...META.settings,paynow:data}); META.settings={...META.settings,paynow:data}; render(); toast("PayNow QR saved \u2713"); } }
+    catch(err){ toast("Couldn't read that image. Try a screenshot of your PayNow QR."); }
+    e.target.value=""; return; }
   if(e.target.id!=="restore" || !e.target.files[0]) return;
   try{
     const data=JSON.parse(await e.target.files[0].text()); let n=0, batch=writeBatch(fs), inBatch=0;
@@ -957,7 +1159,7 @@ document.addEventListener("change",async e=>{
   }catch(err){ toast("That file isn't a QiQi backup."); }
   e.target.value="";
 });
-$("#dlg").addEventListener("close",()=>{ editing=null; render(); });
+$("#dlg").addEventListener("close",()=>{ editing=null; $("#dlg").classList.remove("ghost-submit"); render(); if(CO&&!$("#co").hidden){ const a=S.appts.find(x=>x.id===CO.id); if(a) CO.reward=loyaltyFor(a); renderCo(); } });
 
 const qtyPending={};
 function bumpQty(id,d){
